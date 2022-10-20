@@ -11,6 +11,7 @@ const ObjectID = require("mongodb").ObjectId;
 
 router.post("/signup/user", async (req, res) => {
     const email = req.body.email;
+    console.log(email);
     const user = await User.findOne({email: email});
     if (user) {
         return res.status(400).send({});
@@ -39,8 +40,19 @@ router.get("/fetch/user/:userID", async (req, res) => {
     }
 })
 
+router.get("/fetch/user/email/:email", async (req, res) => {
+    const email = req.params.email;
+    const user = await User.findOne({email: email})
+    if (user) {
+        return res.status(200).send(user);
+    } else {
+        return res.status(400).send({});
+    }
+})
+
 router.post("/create/post/:userID", async (req, res) => {
     const userId = req.params.userID;
+    console.log("making a post userid ",userId)
     var userObjId = null;
     try {
         userObjId = ObjectID(userId);
@@ -75,6 +87,7 @@ router.post("/create/post/:userID", async (req, res) => {
 
 router.get("/fetch/posts/grade/:userID", async (req, res) => {
     const userId = req.params.userID;
+    console.log(userId);
     var userObjId = null;
     try {
         userObjId = ObjectID(userId);
@@ -84,17 +97,32 @@ router.get("/fetch/posts/grade/:userID", async (req, res) => {
     }
     
     const user = await User.findById(userObjId);
+    console.log(user);
     if (user) {
+        console.log("enetered the if statement");
         const userGrade = user.grade;
-        const gradePostList = await Post.find({grade: userGrade});
+        var gradePostList = await Post.find({grade: userGrade});
+        gradePostList = gradePostList.filter((post) => !(post.isSchoolWide));
         return res.status(200).send(gradePostList);
     } else {
+        console.log("the user doesnt exist")
         return res.status(404).send({});
     }
 })
 
+router.get("/fetch/posts/specific/grade/:grade", async (req, res) => {
+    const grade = req.params.grade
+    if (grade == 1) {
+        var postList = await Post.find({isSchoolWide: true})
+    } else {
+        var postList = await Post.find({grade: grade, isSchoolWide: true})
+    }
+    return res.status(200).send(postList)
+})
+
 router.get("/fetch/posts/schoolwide", async (req, res) => {
-    const postList = await Post.find({isSchoolWide: true});
+    var postList = await Post.find({isSchoolWide: true});
+    postList = postList.filter((post) => !(post.status.toLowerCase() == "resolved"));
     return res.status(200).send(postList);
 })
 
@@ -115,15 +143,18 @@ router.get("/fetch/post/:postID", async (req, res) => {
     }
 })
 
-router.post("/create/post/comment/:postID/:userID", async (req, res) => {
-    const postId = req.params.postID;
-    const userId = req.params.userID;
+router.post("/make/post/comment", async (req, res) => {
+    const postId = req.body.postID;
+    const userId = req.body.userID;
     var postObjId = null;
     var userObjId = null;
     try {
         postObjId = ObjectID(postId);
         userObjId = ObjectID(userId);
     } catch (error) {
+        console.log(postObjId)
+        console.log(userObjId)
+        console.log("404 error")
         return res.status(404).send(error);
     }
 
@@ -163,6 +194,7 @@ router.post("/create/post/comment/:postID/:userID", async (req, res) => {
         }
 
         await User.findOneAndUpdate(userQuery, userUpdatedValues);
+        console.log("youre making this comment: ", newComment)
 
         return res.status(200).send(newComment);
     }
@@ -172,6 +204,11 @@ router.get("/fetch/post/comments/:postID", async (req, res) => {
     const postId = String(req.params.postID);
     const postCommentsList = await Comment.find({postID: postId});
     return res.status(200).send(postCommentsList);
+})
+
+router.get("/fetch/all/comments", async (req, res) => {
+    const commentsList = await Comment.find()
+    return res.status(200).send(commentsList)
 })
 
 router.put("/update/post/likes/:postID/:userID", async (req, res) => {
@@ -191,13 +228,18 @@ router.put("/update/post/likes/:postID/:userID", async (req, res) => {
 
     if (user && post) {
         var postLikes = post.likes;
+        console.log("post likes before ",postLikes)
         if (postLikes.includes(userObjId)) {
+            console.log("post likes includes")
             postLikes = postLikes.filter((user) => !(user.equals(userObjId)));
         } else {
+            console.log("post likes doesnt includes")
             postLikes.push(userObjId);
         }
+        console.log("post likes list after ",postLikes)
+        console.log("post obj id ", postObjId)
 
-        var postQuery = {userID: post.userID};
+        var postQuery = {_id: postObjId};
         var postUpdatedValues = {
             comments: post.comments,
             userID: post.userID,
@@ -209,7 +251,7 @@ router.put("/update/post/likes/:postID/:userID", async (req, res) => {
         }
 
         await Post.findOneAndUpdate(postQuery, postUpdatedValues);
-        return res.status(200).send(postLikes);
+        return res.status(200).send(postUpdatedValues);
     } else {
         return res.status(404).send({});
     }
@@ -228,26 +270,38 @@ router.put("/update/comment/likes/:commentID/:userID", async (req, res) => {
     }
 
     const comment = await Comment.findById(commentObjId);
+    console.log("comment before if statmenet: ", comment);
     const user = await User.findById(userObjId);
-
+    console.log("======================================================================")
     if (user && comment) {
         var commentLikes = comment.likes;
+        console.log("comment likes ", commentLikes)
+        console.log("user id ", userObjId)
+        console.log("printing if comment likes includes user ", commentLikes.includes(userObjId))
         if (commentLikes.includes(userObjId)) {
             commentLikes = commentLikes.filter((user) => !(user.equals(userObjId)));
+            console.log("this user already liked ",commentLikes)
         } else {
             commentLikes.push(userObjId);
+            console.log("this user didnt already like ",commentLikes)
         }
 
-        var commentQuery = {userID: comment.userID};
+        console.log("after if else comments likes list: " ,commentLikes)
+        console.log("==================================================================")
+
+        
+
+        var commentQuery = {_id: commentObjId};
         var commentUpdatedValues = {
             userID: comment.userID,
             postID: comment.postID,
             content: comment.content,
-            likes: commentLikes
+            likes: commentLikes,
+            date: comment.date
         }
 
         await Comment.findOneAndUpdate(commentQuery, commentUpdatedValues);
-        return res.status(200).send(commentLikes);
+        return res.status(200).send(commentUpdatedValues);
     } else {
         return res.status(404).send({});
     }
@@ -372,6 +426,30 @@ router.get("/fetch/posts/:userID", async (req, res) => {
     } else {
         return res.status(400).send({});
     }
+})
+
+router.get("/fetch/status/posts/:userID/:status", async (req, res) => {
+    const userId = req.params.userID;
+    var userObjId = null
+    try {
+        userObjId = ObjectID(userId);
+    } catch(error) {
+        return res.status(400).send(error);
+    }
+    const user = await User.findById(userObjId);
+    if (user) {
+        const status = req.params.status
+        var userPostsList = await Post.find({userID: userId, status: status});
+        return res.status(200).send(userPostsList);
+    } else {
+        return res.status(400).send({});
+    }
+})
+
+router.get("/fetch/status/all/posts/:status", async (req, res) => {
+    const status = req.params.status
+    var userPostsList = await Post.find({status: status});
+    return res.status(200).send(userPostsList);
 })
 
 router.get("/fetch/comments/:userID", async (req, res) => {

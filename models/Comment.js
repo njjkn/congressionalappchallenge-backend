@@ -5,6 +5,7 @@ const CommentSchema = new Schema({
     userID: String,
     postID: String,
     content: String,
+    date: String,
     likes: Array
 })
 
