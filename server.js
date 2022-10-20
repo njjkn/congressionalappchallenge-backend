@@ -5,7 +5,7 @@ const morgan = require('morgan')
 const connectDB = require('./db')
 const home = require('./routes/api/home')
 
-const PORT = 5000;
+const PORT = process.env.PORT || 4000;
 const app = express();
 
 app.use(bodyParser.urlencoded({ extended: false }));
