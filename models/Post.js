@@ -10,7 +10,8 @@ const PostSchema = new Schema({
     date: String,
     status: String,
     grade: Number,
-    isSchoolWide: Boolean
+    isSchoolWide: Boolean,
+    isApproved: Boolean,
 })
 
 module.exports = mongoose.model('Post', PostSchema);

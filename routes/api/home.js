@@ -247,7 +247,8 @@ router.put("/update/post/likes/:postID/:userID", async (req, res) => {
             content: post.content,
             status: post.status,
             grade: post.grade,
-            isSchoolWide: post.isSchoolWide
+            isSchoolWide: post.isSchoolWide,
+            isApproved: post.isApproved
         }
 
         await Post.findOneAndUpdate(postQuery, postUpdatedValues);
@@ -323,11 +324,14 @@ router.put("/update/post/status/:postID/:userID", async (req, res) => {
     const user = await User.findById(userObjId);
 
     if (post && user) {
+        if (user.isStudentRep != true) {
+            return res.status(400).send()
+        }
         const updatedStatus = req.body.status.toLowerCase();
         if (!statusArray.includes(updatedStatus)) {
             return res.status(400).send({});
         }
-        var postQuery = {userID: post.userID};
+        var postQuery = {_id: post._id};
         var postUpdatedValues = {
             comments: post.comments,
             userID: post.userID,
@@ -335,11 +339,44 @@ router.put("/update/post/status/:postID/:userID", async (req, res) => {
             content: post.content,
             status: updatedStatus,
             grade: post.grade,
-            isSchoolWide: post.isSchoolWide
+            isSchoolWide: post.isSchoolWide,
+            isApproved: post.isApproved
         }
 
         await Post.findOneAndUpdate(postQuery, postUpdatedValues);
         return res.status(200).send(postUpdatedValues);
+    } else {
+        return res.status(400).send({})
+    }
+})
+
+router.put("/update/post/approval/:postId", async(req, res) => {
+    const postId = req.params.postId;
+    var postObjId = null;
+    try {
+        postObjId = ObjectID(postId);
+    } catch(error) {
+        return res.status(404).send({});
+    }
+    console.log(postObjId)
+    const post = await Post.findById(postObjId);
+    console.log(post)
+    if (post) {
+        var postQuery = {_id: postObjId};
+        var postUpdatedValues = {
+            comments: post.comments,
+            userID: post.userID,
+            likes: post.likes,
+            content: post.content,
+            status: post.status,
+            grade: post.grade,
+            isSchoolWide: post.isSchoolWide,
+            isApproved: true
+        }
+        await Post.findOneAndUpdate(postQuery, postUpdatedValues);
+        return res.status(200).send(postUpdatedValues)
+    } else {
+        return res.status(400).send({})
     }
 })
 
@@ -411,6 +448,24 @@ router.delete("/remove/comment/:commentID", async (req, res) => {
     }
 })
 
+router.delete("/remove/post/:postID", async (req, res) => {
+    const postId = req.params.postID
+    var postObjId = null
+    try {
+        postObjId = ObjectID(postId)
+    } catch(err) {
+        return res.status(400).send(err)
+    }
+    const post = await Post.findById(postObjId)
+    if (post) {
+        const deletePost = await Post.deleteOne({_id: postId})
+        return res.status(200).send(deletePost)
+    } else {
+        console.log("post doesnt exist")
+        return res.status(400).send({})
+    }
+})
+
 router.get("/fetch/posts/:userID", async (req, res) => {
     const userId = req.params.userID;
     var userObjId = null
@@ -426,6 +481,11 @@ router.get("/fetch/posts/:userID", async (req, res) => {
     } else {
         return res.status(400).send({});
     }
+})
+
+router.get("/fetch/all/users/posts", async (req, res) => {
+    var posts = await Post.find()
+    return res.status(200).send(posts)
 })
 
 router.get("/fetch/status/posts/:userID/:status", async (req, res) => {
@@ -448,6 +508,7 @@ router.get("/fetch/status/posts/:userID/:status", async (req, res) => {
 
 router.get("/fetch/status/all/posts/:status", async (req, res) => {
     const status = req.params.status
+    console.log(status)
     var userPostsList = await Post.find({status: status});
     return res.status(200).send(userPostsList);
 })
